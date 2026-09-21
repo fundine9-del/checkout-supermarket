@@ -47,4 +47,25 @@ export interface Stats {
   today_orders_count: number
   avg_order_value: number
   top_products: { name: string; quantity: number; revenue: number }[]
+  wallet: {
+    balance: number
+    currency: string
+    total_in: number
+    total_out: number
+  } | null
+}
+
+export type TransactionType = 'payment' | 'refund' | 'withdrawal' | 'deposit'
+
+export interface Transaction {
+  id: string
+  order_id: string | null
+  type: TransactionType
+  amount: number
+  balance_after: number
+  payment_method: string | null
+  status: 'pending' | 'completed' | 'failed'
+  reference: string | null
+  description: string | null
+  created_at: string
 }

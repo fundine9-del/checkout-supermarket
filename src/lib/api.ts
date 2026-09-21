@@ -1,4 +1,4 @@
-import type { Item, ItemDraft, Sale, Stats, Supermarket } from './types'
+import type { Item, ItemDraft, Sale, Stats, Supermarket, Transaction } from './types'
 
 const BASE = '/api'
 
@@ -67,6 +67,8 @@ export function createApi(token: string) {
 
     sales: () => req<{ sales: Sale[] }>('/supermarkets/me/sales', auth),
     stats: () => req<{ stats: Stats }>('/supermarkets/me/stats', auth),
+    transactions: () =>
+      req<{ transactions: Transaction[] }>('/supermarkets/me/transactions', auth),
   }
 }
 
