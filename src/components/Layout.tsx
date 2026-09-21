@@ -3,6 +3,7 @@ import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Package,
+  QrCode,
   ReceiptText,
   LogOut,
   Store as StoreIcon,
@@ -89,6 +90,7 @@ const navItems = [
   { to: '/overview', label: 'Overview', icon: LayoutDashboard },
   { to: '/products', label: 'Products', icon: Package },
   { to: '/sales', label: 'Sales', icon: ReceiptText },
+  { to: '/qr', label: 'QR code', icon: QrCode },
 ]
 
 /** Sidebar shell for the signed-in dashboard. */
