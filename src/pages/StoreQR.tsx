@@ -4,7 +4,7 @@ import { Copy, MapPin, QrCode, ScanLine, Smartphone } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const LINK_KEY = 'checkout.kiosk-link'
-const DEFAULT_LINK = 'http://localhost:5174'
+const DEFAULT_LINK = 'https://checkout-client.vercel.app'
 
 export function StoreQRPage() {
   const { store } = useAuth()
