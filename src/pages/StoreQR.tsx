@@ -6,9 +6,26 @@ import { useAuth } from '../context/AuthContext'
 const LINK_KEY = 'checkout.kiosk-link'
 const DEFAULT_LINK = 'https://checkout-client.vercel.app'
 
+/**
+ * Accept only a production-ready kiosk link. Any value left over from an old
+ * dev build (localhost / 127.0.0.1 / plain http) is rejected so browsers that
+ * saved the local dev URL auto-heal to the deployed customer app on next load.
+ */
+function sanitizeLink(value: string | null): string | null {
+  if (!value) return null
+  if (value.includes('localhost') || value.includes('127.0.0.1') || value.includes('[::1]')) return null
+  if (!value.startsWith('https://') && !value.startsWith('http://')) return null
+  return value
+}
+
 export function StoreQRPage() {
   const { store } = useAuth()
-  const [link, setLink] = useState(() => localStorage.getItem(LINK_KEY) ?? DEFAULT_LINK)
+  const [link, setLink] = useState(() => {
+    const stored = localStorage.getItem(LINK_KEY)
+    const cleaned = sanitizeLink(stored)
+    if (cleaned === null && stored !== null) localStorage.removeItem(LINK_KEY)
+    return cleaned ?? DEFAULT_LINK
+  })
   const [qr, setQr] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
