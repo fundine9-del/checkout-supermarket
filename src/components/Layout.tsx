@@ -5,6 +5,7 @@ import {
   Package,
   QrCode,
   ReceiptText,
+  Plug,
   LogOut,
   Store as StoreIcon,
   ShoppingBasket,
@@ -91,6 +92,7 @@ const navItems = [
   { to: '/products', label: 'Products', icon: Package },
   { to: '/sales', label: 'Sales', icon: ReceiptText },
   { to: '/qr', label: 'QR code', icon: QrCode },
+  { to: '/integrations', label: 'Integrations', icon: Plug },
 ]
 
 /** Sidebar shell for the signed-in dashboard. */

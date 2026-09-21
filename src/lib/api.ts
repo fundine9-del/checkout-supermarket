@@ -69,6 +69,17 @@ export function createApi(token: string) {
     stats: () => req<{ stats: Stats }>('/supermarkets/me/stats', auth),
     transactions: () =>
       req<{ transactions: Transaction[] }>('/supermarkets/me/transactions', auth),
+
+    integration: () =>
+      req<{
+        store_id: string
+        store_name: string
+        api_key: string
+        key_prefix: string
+        base_url: string
+        auth_header: string
+        endpoints: string[]
+      }>('/supermarkets/me/integration', auth),
   }
 }
 

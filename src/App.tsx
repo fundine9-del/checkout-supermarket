@@ -6,6 +6,7 @@ import { OverviewPage } from './pages/Overview'
 import { ProductsPage } from './pages/Products'
 import { SalesPage } from './pages/Sales'
 import { StoreQRPage } from './pages/StoreQR'
+import { IntegrationsPage } from './pages/Integrations'
 import { useAuth } from './context/AuthContext'
 
 function HomeRedirect() {
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/sales" element={<SalesPage />} />
         <Route path="/qr" element={<StoreQRPage />} />
+        <Route path="/integrations" element={<IntegrationsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
