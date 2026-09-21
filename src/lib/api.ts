@@ -1,6 +1,8 @@
 import type { Item, ItemDraft, Sale, Stats, Supermarket, Transaction } from './types'
 
-const BASE = '/api'
+// API base. In dev, Vite can proxy `/api` to the server (see vite.config.ts);
+// in production builds VITE_API_URL points straight at the deployed server.
+const BASE = import.meta.env.VITE_API_URL ?? 'https://checkout-production-bbfe.up.railway.app/api'
 
 export class ApiError extends Error {}
 
