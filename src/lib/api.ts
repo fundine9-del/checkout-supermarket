@@ -1,4 +1,13 @@
-import type { Item, ItemDraft, Sale, Stats, Supermarket, Transaction } from './types'
+import type {
+  Item,
+  ItemDraft,
+  OrderWithItems,
+  Receipt,
+  Sale,
+  Stats,
+  Supermarket,
+  Transaction,
+} from './types'
 
 // API base. In dev, Vite can proxy `/api` to the server (see vite.config.ts);
 // in production builds VITE_API_URL points straight at the deployed server.
@@ -71,6 +80,41 @@ export function createApi(token: string) {
     stats: () => req<{ stats: Stats }>('/supermarkets/me/stats', auth),
     transactions: () =>
       req<{ transactions: Transaction[] }>('/supermarkets/me/transactions', auth),
+
+    // Manual-sale flow: create an open order for this supermarket, scan items
+    // in by barcode, adjust quantities, then check out with a payment method.
+    // The server scopes barcode resolution to the store's catalogue and
+    // decrements stock + credits the wallet on checkout (customer-flow parity).
+    createOrder: (storeId: string) =>
+      req<{ order: OrderWithItems }>('/orders', {
+        method: 'POST',
+        body: { store_id: storeId },
+        ...auth,
+      }),
+    fetchOrder: (orderId: string) =>
+      req<{ order: OrderWithItems }>(`/orders/${orderId}`, auth),
+    addItem: (orderId: string, barcode: string, quantity = 1) =>
+      req<{ order: OrderWithItems }>(`/orders/${orderId}/items`, {
+        method: 'POST',
+        body: { barcode, quantity },
+        ...auth,
+      }),
+    updateItemQuantity: (orderId: string, itemId: string, quantity: number) =>
+      req<{ order: OrderWithItems }>(`/orders/${orderId}/items/${itemId}`, {
+        method: 'PATCH',
+        body: { quantity },
+        ...auth,
+      }),
+    removeItem: (orderId: string, itemId: string) =>
+      req<{ order: OrderWithItems }>(`/orders/${orderId}/items/${itemId}`, {
+        method: 'DELETE',
+        ...auth,
+      }),
+    checkout: (orderId: string, paymentMethod: string) =>
+      req<{ order: OrderWithItems; receipt: Receipt }>(
+        `/orders/${orderId}/checkout`,
+        { method: 'POST', body: { payment_method: paymentMethod }, ...auth },
+      ),
 
     integration: () =>
       req<{

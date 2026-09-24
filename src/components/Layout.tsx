@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
 import {
+  ChartLine,
   LayoutDashboard,
   Package,
   QrCode,
@@ -89,6 +90,7 @@ function StoreGate({ children }: { children: ReactNode }) {
 
 const navItems = [
   { to: '/overview', label: 'Overview', icon: LayoutDashboard },
+  { to: '/analytics', label: 'Analytics', icon: ChartLine },
   { to: '/products', label: 'Products', icon: Package },
   { to: '/sales', label: 'Sales', icon: ReceiptText },
   { to: '/qr', label: 'QR code', icon: QrCode },

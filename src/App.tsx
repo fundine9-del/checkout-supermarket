@@ -3,6 +3,7 @@ import { DashboardLayout, RequireAuth } from './components/Layout'
 import { LoginPage } from './pages/Login'
 import { SignupPage } from './pages/Signup'
 import { OverviewPage } from './pages/Overview'
+import { AnalyticsPage } from './pages/Analytics'
 import { ProductsPage } from './pages/Products'
 import { SalesPage } from './pages/Sales'
 import { StoreQRPage } from './pages/StoreQR'
@@ -30,6 +31,7 @@ export default function App() {
         }
       >
         <Route path="/overview" element={<OverviewPage />} />
+        <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/sales" element={<SalesPage />} />
         <Route path="/qr" element={<StoreQRPage />} />

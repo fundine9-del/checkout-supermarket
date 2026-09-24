@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, ReceiptText } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, ReceiptText } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { formatMoney, formatTime, shortId } from '../lib/api'
 import type { Sale } from '../lib/types'
+import { NewSaleModal } from '../components/NewSaleModal'
 
 const methodLabels: Record<string, string> = {
   cash: 'Cash',
@@ -16,6 +17,7 @@ export function SalesPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [saleOpen, setSaleOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!api) return
@@ -66,12 +68,23 @@ export function SalesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-900">Sales</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        {sales.length > 0
-          ? `${sales.length} completed order${sales.length === 1 ? '' : 's'} — newest first.`
-          : 'No paid orders yet.'}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Sales</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {sales.length > 0
+              ? `${sales.length} completed order${sales.length === 1 ? '' : 's'} — newest first.`
+              : 'No paid orders yet.'}
+          </p>
+        </div>
+        <button
+          onClick={() => setSaleOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+        >
+          <Plus className="h-4 w-4" />
+          New sale
+        </button>
+      </div>
 
       {sales.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-slate-300 p-10 text-center">
@@ -137,6 +150,16 @@ export function SalesPage() {
             )
           })}
         </div>
+      )}
+
+      {saleOpen && (
+        <NewSaleModal
+          onClose={() => setSaleOpen(false)}
+          onComplete={() => {
+            setSaleOpen(false)
+            void load()
+          }}
+        />
       )}
     </div>
   )
