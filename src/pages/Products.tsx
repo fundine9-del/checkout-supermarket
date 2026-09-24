@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Package, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Package, Pencil, Plus, ScanLine, Search, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { ProductScanModal } from '../components/ProductScanModal'
 import { formatMoney } from '../lib/api'
 import type { Item } from '../lib/types'
 
@@ -16,6 +17,7 @@ export function ProductsPage() {
 
   // modal state
   const [modalOpen, setModalOpen] = useState(false)
+  const [scanOpen, setScanOpen] = useState(false)
   const [editing, setEditing] = useState<Item | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
   const [saving, setSaving] = useState(false)
@@ -243,15 +245,25 @@ export function ProductsPage() {
             </label>
 
             <div className="mt-4 grid grid-cols-2 gap-4">
-              <label className="block text-sm font-medium text-slate-700">
-                Barcode
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-700">Barcode</label>
+                  <button
+                    type="button"
+                    onClick={() => setScanOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50"
+                  >
+                    <ScanLine className="h-3.5 w-3.5" />
+                    Scan
+                  </button>
+                </div>
                 <input
                   value={draft.barcode}
                   onChange={(e) => setDraft({ ...draft, barcode: e.target.value })}
                   required
                   className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
                 />
-              </label>
+              </div>
               <label className="block text-sm font-medium text-slate-700">
                 Category
                 <input
@@ -309,6 +321,16 @@ export function ProductsPage() {
             </div>
           </form>
         </div>
+      )}
+
+      {scanOpen && (
+        <ProductScanModal
+          onBarcode={(raw) => {
+            setDraft({ ...draft, barcode: raw })
+            setScanOpen(false)
+          }}
+          onClose={() => setScanOpen(false)}
+        />
       )}
     </div>
   )
