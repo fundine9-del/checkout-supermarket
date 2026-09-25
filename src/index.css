@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+/* Print only the receipt. The POS receipt lives inside a modal overlay, so
+   hide everything else on paper and lift the receipt card to the top-left. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-receipt,
+  .print-receipt * {
+    visibility: visible;
+  }
+  .print-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

@@ -7,6 +7,10 @@ interface ProductScanModalProps {
   /** Called once a barcode is detected by the camera (or typed manually). */
   onBarcode: (raw: string) => void
   onClose: () => void
+  /** Detector formats. Defaults to product barcodes (EAN/UPC); pass QR formats to scan printer QR codes. */
+  formats?: string[]
+  title?: string
+  hint?: string
 }
 
 type CameraState = 'idle' | 'starting' | 'on' | 'unavailable'
@@ -16,8 +20,15 @@ type CameraState = 'idle' | 'starting' | 'on' | 'unavailable'
  * byte-proven detect loop the customer webapp ships in ScanPage/ScanStoreModal
  * (getUserMedia → video → BarcodeDetector.detect(canvas) → rawValue), so a
  * supermarket can scan a product's EAN/UPC barcode instead of typing it.
+ * Also used to scan printer QR codes (pass `qrFormats`).
  */
-export function ProductScanModal({ onBarcode, onClose }: ProductScanModalProps) {
+export function ProductScanModal({
+  onBarcode,
+  onClose,
+  formats = barcodeFormats,
+  title = 'Scan product barcode',
+  hint = 'Point the camera at the product barcode.',
+}: ProductScanModalProps) {
   const [cameraState, setCameraState] = useState<CameraState>(
     barcodeDetectorSupported ? 'idle' : 'unavailable',
   )
@@ -62,7 +73,7 @@ export function ProductScanModal({ onBarcode, onClose }: ProductScanModalProps) 
           await video.play()
         }
         detectorRef.current = new window.BarcodeDetector!({
-          formats: barcodeFormats,
+          formats,
         })
         setCameraState('on')
         scheduleFrame()
@@ -127,7 +138,7 @@ export function ProductScanModal({ onBarcode, onClose }: ProductScanModalProps) 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
       <header className="flex items-center justify-between px-4 py-4 text-white">
-        <h1 className="text-lg font-semibold">Scan product barcode</h1>
+        <h1 className="text-lg font-semibold">{title}</h1>
         <button
           onClick={onClose}
           className="rounded-lg p-2 text-white/80 hover:bg-white/10"
@@ -154,7 +165,7 @@ export function ProductScanModal({ onBarcode, onClose }: ProductScanModalProps) 
             )}
           </div>
           <p className="mt-4 px-4 pb-2 text-center text-sm text-white/60">
-            Point the camera at the product barcode.
+            {hint}
           </p>
         </>
       ) : (

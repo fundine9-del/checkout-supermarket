@@ -2,6 +2,8 @@ import type {
   Item,
   ItemDraft,
   OrderWithItems,
+  PrintJob,
+  Printer,
   Receipt,
   Sale,
   Stats,
@@ -80,6 +82,39 @@ export function createApi(token: string) {
     stats: () => req<{ stats: Stats }>('/supermarkets/me/stats', auth),
     transactions: () =>
       req<{ transactions: Transaction[] }>('/supermarkets/me/transactions', auth),
+
+    // Receipt printers (Printer Agent feature): register a printer per till,
+    // bond this till to a printer, and queue paid-order receipts for printing.
+    myPrinters: () => req<{ printers: Printer[] }>('/supermarkets/me/printers', auth),
+    createPrinter: (till: string) =>
+      req<{ printer: Printer }>('/supermarkets/me/printers', {
+        method: 'POST',
+        body: { till },
+        ...auth,
+      }),
+    updatePrinter: (id: string, till: string) =>
+      req<{ printer: Printer }>(`/supermarkets/me/printers/${id}`, {
+        method: 'PATCH',
+        body: { till },
+        ...auth,
+      }),
+    deletePrinter: (id: string) =>
+      req<{ ok: true }>(`/supermarkets/me/printers/${id}`, {
+        method: 'DELETE',
+        ...auth,
+      }),
+    connectPrinter: (id: string, device: string) =>
+      req<{ printer: Printer }>(`/supermarkets/me/printers/${id}/connect`, {
+        method: 'POST',
+        body: { device },
+        ...auth,
+      }),
+    enqueuePrintJob: (printerId: string, orderId: string) =>
+      req<{ job: PrintJob }>(`/supermarkets/me/printers/${printerId}/jobs`, {
+        method: 'POST',
+        body: { order_id: orderId },
+        ...auth,
+      }),
 
     // Manual-sale flow: create an open order for this supermarket, scan items
     // in by barcode, adjust quantities, then check out with a payment method.

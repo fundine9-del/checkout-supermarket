@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Minus, Plus, ScanLine, ShoppingCart, Trash2, X } from 'lucide-react'
+import {
+  CircleCheck,
+  Minus,
+  Plus,
+  Printer,
+  ScanLine,
+  ShoppingCart,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { formatMoney } from '../lib/api'
-import type { OrderWithItems } from '../lib/types'
+import { formatMoney, formatTime, shortId } from '../lib/api'
+import { getConnectedPrinter } from '../lib/printers'
+import type { OrderWithItems, Receipt } from '../lib/types'
 import { ProductScanModal } from './ProductScanModal'
 
 type PaymentMethod = 'cash' | 'card' | 'mobile'
 
-const methodLabels: Record<PaymentMethod, string> = {
+const methodLabels: Record<string, string> = {
   cash: 'Cash',
   card: 'Card',
   mobile: 'Mobile Money',
@@ -33,6 +43,9 @@ export function NewSaleModal({ onClose, onComplete }: NewSaleModalProps) {
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
+  // Whether the receipt was dispatched to the bonded till printer (Printer Agent).
+  const [printState, setPrintState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
 
   // Start an open order for this supermarket on mount.
   useEffect(() => {
@@ -99,15 +112,164 @@ export function NewSaleModal({ onClose, onComplete }: NewSaleModalProps) {
     setBusy(true)
     setError(null)
     try {
-      await api.checkout(order.id, method)
-      onComplete()
+      const { receipt: paid } = await api.checkout(order.id, method)
+      setReceipt(paid)
+      setBusy(false)
+      void dispatchToPrinter()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed')
       setBusy(false)
     }
   }
 
+  /** Queue the receipt for the printer this till is bonded to (if any). */
+  async function dispatchToPrinter() {
+    if (!api || !order) return
+    const printer = getConnectedPrinter()
+    if (!printer) return
+    setPrintState('sending')
+    try {
+      await api.enqueuePrintJob(printer.id, order.id)
+      setPrintState('sent')
+    } catch {
+      setPrintState('failed')
+    }
+  }
+
   const lineCount = order?.items?.reduce((sum, line) => sum + line.quantity, 0) ?? 0
+  const connectedPrinter = getConnectedPrinter()
+
+  // Sale paid — show the printable receipt instead of the cart.
+  if (receipt) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 print:bg-white">
+        <div className="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:overflow-visible print:rounded-none print:p-0 print:shadow-none">
+          <div className="text-center print:hidden">
+            <CircleCheck className="mx-auto h-14 w-14 text-emerald-500" />
+            <h2 className="mt-3 text-xl font-semibold text-slate-900">Sale completed!</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Order #{shortId(receipt.order_id)} · {formatTime(receipt.paid_at)}
+            </p>
+          </div>
+
+          {connectedPrinter && printState !== 'idle' && (
+            <div
+              className={`mt-4 rounded-xl px-4 py-3 text-sm print:hidden ${
+                printState === 'failed' ? 'bg-amber-50 text-amber-800' : 'bg-teal-50 text-teal-800'
+              }`}
+            >
+              {printState === 'sending' && (
+                <p className="flex items-center gap-2">
+                  <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-teal-500" />
+                  Sending the receipt to {connectedPrinter.till}&apos;s printer…
+                </p>
+              )}
+              {printState === 'sent' && (
+                <p className="flex items-center justify-between gap-3">
+                  <span>✓ Receipt sent to {connectedPrinter.till}&apos;s printer.</span>
+                  <button
+                    onClick={() => void dispatchToPrinter()}
+                    className="shrink-0 font-medium underline"
+                  >
+                    Send again
+                  </button>
+                </p>
+              )}
+              {printState === 'failed' && (
+                <p className="flex items-center justify-between gap-3">
+                  <span>Couldn&apos;t reach the {connectedPrinter.till} printer agent.</span>
+                  <button
+                    onClick={() => void dispatchToPrinter()}
+                    className="shrink-0 font-medium underline"
+                  >
+                    Try again
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* The printable receipt */}
+          <div className="print-receipt mt-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 print:mt-0 print:max-w-none print:rounded-none print:p-4 print:shadow-none print:ring-0">
+            <div className="text-center">
+              <p className="text-base font-bold text-slate-900">
+                {receipt.store_name ?? 'Check Out'}
+              </p>
+              <p className="mt-0.5 text-xs uppercase tracking-wider text-slate-400">
+                Sales receipt
+              </p>
+            </div>
+
+            <div className="mt-4 border-t border-dashed border-slate-300" />
+
+            <dl className="mt-4 space-y-1.5 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-400">Order</dt>
+                <dd className="font-medium text-slate-800">#{shortId(receipt.order_id)}</dd>
+              </div>
+              {receipt.customer_name && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Customer</dt>
+                  <dd className="font-medium text-slate-800">{receipt.customer_name}</dd>
+                </div>
+              )}
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-400">Date</dt>
+                <dd className="font-medium text-slate-800">{formatTime(receipt.paid_at)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-400">Paid with</dt>
+                <dd className="font-medium text-slate-800">
+                  {methodLabels[receipt.payment_method] ?? receipt.payment_method}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-4 border-t border-dashed border-slate-300" />
+
+            <ul className="mt-4 space-y-2.5">
+              {receipt.items.map((line, i) => (
+                <li key={i} className="flex items-start justify-between gap-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-800">{line.name}</p>
+                    <p className="text-xs text-slate-400">
+                      {line.quantity} × {formatMoney(line.unit_price)}
+                      {line.barcode ? ` · ${line.barcode}` : ''}
+                    </p>
+                  </div>
+                  <p className="font-medium text-slate-800">{formatMoney(line.line_total)}</p>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-4 border-t border-dashed border-slate-300" />
+
+            <div className="mt-4 flex justify-between">
+              <span className="text-base font-semibold text-slate-900">Total</span>
+              <span className="text-lg font-bold text-slate-900">{formatMoney(receipt.total)}</span>
+            </div>
+
+            <p className="mt-6 text-center text-xs text-slate-400">Thank you for shopping with us!</p>
+          </div>
+
+          <div className="mt-6 flex gap-3 print:hidden">
+            <button
+              onClick={() => window.print()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-teal-600 px-4 py-2.5 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+            >
+              <Printer className="h-4 w-4" /> Print receipt
+            </button>
+            <button
+              onClick={onComplete}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">

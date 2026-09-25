@@ -85,6 +85,31 @@ export interface Sale {
   items: OrderLine[]
 }
 
+// ------------------------------------------------------------ printers
+
+export interface PrinterConnection {
+  device: string | null
+  last_seen: string
+}
+
+/** A registered receipt printer (PRN-XXXXXX) for one supermarket till. */
+export interface Printer {
+  id: string
+  till: string
+  /** Token used to build the setup QR (the Printer Agent's credential). */
+  token: string
+  created_at: string
+  connection: PrinterConnection | null
+}
+
+export interface PrintJob {
+  id: string
+  printer_id: string
+  order_id: string
+  status: 'pending' | 'printing' | 'done' | 'failed'
+  created_at: string
+}
+
 export interface Stats {
   revenue: number
   today_revenue: number

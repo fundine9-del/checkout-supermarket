@@ -6,6 +6,7 @@ import { OverviewPage } from './pages/Overview'
 import { AnalyticsPage } from './pages/Analytics'
 import { ProductsPage } from './pages/Products'
 import { SalesPage } from './pages/Sales'
+import { PrintersPage } from './pages/Printers'
 import { StoreQRPage } from './pages/StoreQR'
 import { IntegrationsPage } from './pages/Integrations'
 import { useAuth } from './context/AuthContext'
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/sales" element={<SalesPage />} />
+        <Route path="/printers" element={<PrintersPage />} />
         <Route path="/qr" element={<StoreQRPage />} />
         <Route path="/integrations" element={<IntegrationsPage />} />
       </Route>

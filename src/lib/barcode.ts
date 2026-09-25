@@ -29,3 +29,9 @@ export const barcodeFormats = [
   'code_39',
   'codabar',
 ]
+
+/** QR codes are read with the same detector for the printer-bond flow. */
+export const qrFormats = ['qr_code']
+
+/** The Chromium gate covers QR too — BarcodeDetector ships QR support wherever it exists. */
+export const qrDetectorSupported: boolean = barcodeDetectorSupported

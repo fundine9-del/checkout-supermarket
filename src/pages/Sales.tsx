@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, ReceiptText } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronDown, ChevronRight, Plus, ReceiptText, ScanLine } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { formatMoney, formatTime, shortId } from '../lib/api'
+import { qrFormats } from '../lib/barcode'
+import { decodeReceiptLink, getConnectedPrinter } from '../lib/printers'
 import type { Sale } from '../lib/types'
 import { NewSaleModal } from '../components/NewSaleModal'
+import { ProductScanModal } from '../components/ProductScanModal'
 
 const methodLabels: Record<string, string> = {
   cash: 'Cash',
@@ -18,6 +21,10 @@ export function SalesPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saleOpen, setSaleOpen] = useState(false)
+  const [printScanOpen, setPrintScanOpen] = useState(false)
+  const [printState, setPrintState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [printMessage, setPrintMessage] = useState<string | null>(null)
+  const lastQrRef = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     if (!api) return
@@ -45,6 +52,38 @@ export function SalesPage() {
       else next.add(id)
       return next
     })
+  }
+
+  /** Reprint a customer's receipt on the bonded till printer from its QR. */
+  async function printReceiptFromQr(raw: string) {
+    const orderId = decodeReceiptLink(raw)
+    if (!orderId) {
+      setPrintState('failed')
+      setPrintMessage('That QR is not a Check Out receipt — scan the code on the customer\u2019s digital receipt.')
+      return
+    }
+    const printer = getConnectedPrinter()
+    if (!printer) {
+      setPrintState('failed')
+      setPrintMessage('Connect a till printer first — Printers page \u2192 "Use at this till".')
+      return
+    }
+    if (!api) return
+    setPrintState('sending')
+    setPrintMessage(null)
+    try {
+      await api.enqueuePrintJob(printer.id, orderId)
+      setPrintState('sent')
+      setPrintMessage(`Receipt #${shortId(orderId)} sent to ${printer.till}.`)
+    } catch (err) {
+      setPrintState('failed')
+      setPrintMessage(err instanceof Error ? err.message : 'Could not print that receipt.')
+    }
+  }
+
+  function handleScan(raw: string) {
+    lastQrRef.current = raw
+    void printReceiptFromQr(raw)
   }
 
   if (loading) {
@@ -77,14 +116,48 @@ export function SalesPage() {
               : 'No paid orders yet.'}
           </p>
         </div>
-        <button
-          onClick={() => setSaleOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-        >
-          <Plus className="h-4 w-4" />
-          New sale
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPrintScanOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-100"
+          >
+            <ScanLine className="h-4 w-4" />
+            Print receipt by QR
+          </button>
+          <button
+            onClick={() => setSaleOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+          >
+            <Plus className="h-4 w-4" />
+            New sale
+          </button>
+        </div>
       </div>
+
+      {printState !== 'idle' && printMessage && (
+        <div
+          className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+            printState === 'failed'
+              ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+              : 'bg-teal-50 text-teal-800 ring-1 ring-teal-200'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p>{printMessage}</p>
+            {printState === 'failed' && (
+              <button
+                onClick={() => {
+                  const raw = lastQrRef.current
+                  if (raw) void printReceiptFromQr(raw)
+                }}
+                className="shrink-0 font-medium underline"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {sales.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-slate-300 p-10 text-center">
@@ -159,6 +232,16 @@ export function SalesPage() {
             setSaleOpen(false)
             void load()
           }}
+        />
+      )}
+
+      {printScanOpen && (
+        <ProductScanModal
+          title="Scan customer receipt"
+          hint="Point the camera at the QR on the customer's digital receipt to print it here."
+          formats={qrFormats}
+          onBarcode={handleScan}
+          onClose={() => setPrintScanOpen(false)}
         />
       )}
     </div>

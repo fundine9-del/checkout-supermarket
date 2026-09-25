@@ -4,6 +4,7 @@ import {
   ChartLine,
   LayoutDashboard,
   Package,
+  Printer as PrinterIcon,
   QrCode,
   ReceiptText,
   Plug,
@@ -93,6 +94,7 @@ const navItems = [
   { to: '/analytics', label: 'Analytics', icon: ChartLine },
   { to: '/products', label: 'Products', icon: Package },
   { to: '/sales', label: 'Sales', icon: ReceiptText },
+  { to: '/printers', label: 'Printers', icon: PrinterIcon },
   { to: '/qr', label: 'QR code', icon: QrCode },
   { to: '/integrations', label: 'Integrations', icon: Plug },
 ]
