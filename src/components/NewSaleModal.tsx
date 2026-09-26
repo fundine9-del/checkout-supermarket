@@ -23,6 +23,124 @@ const methodLabels: Record<string, string> = {
   mobile: 'Mobile Money',
 }
 
+// ------------------------------------------------------------------ fiscal
+// KRA-style monospace receipt layout (mirrors printer-agent/agent.mjs).
+const RECEIPT_W = 46
+
+function padReceipt(text: string | null | undefined, width: number): string {
+  const t = String(text ?? '')
+  return t.length >= width ? t.slice(0, width) : t.padEnd(width, ' ')
+}
+
+function padReceiptStart(text: string | null | undefined, width: number): string {
+  return String(text ?? '').padStart(width, ' ')
+}
+
+function centerReceipt(text: string, width: number): string {
+  const left = Math.max(0, Math.floor((width - text.length) / 2))
+  return ' '.repeat(left) + text.slice(0, width - left)
+}
+
+function moneyPlain(value: number): string {
+  return value.toLocaleString('en-KE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function receiptStamp(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(d.getHours())}:${p(
+    d.getMinutes(),
+  )}:${p(d.getSeconds())}`
+}
+
+function receiptLines(receipt: Receipt): string[] {
+  const W = RECEIPT_W
+  const DASH = '-'.repeat(W)
+  const EQ = '='.repeat(W)
+  const lines: string[] = []
+
+  lines.push(EQ)
+  lines.push(centerReceipt((receipt.store_name ?? 'Check Out').toUpperCase(), W))
+  if (receipt.vat_number) lines.push(centerReceipt(`VAT #: ${receipt.vat_number}`, W))
+  if (receipt.pin) lines.push(centerReceipt(`PIN: ${receipt.pin}`, W))
+  lines.push('')
+  const saleLine = `Sale # ${shortId(receipt.order_id)}`
+  lines.push(
+    (receipt.till_number ? `${saleLine}  Till No: ${receipt.till_number}` : saleLine).trimEnd(),
+  )
+  lines.push(`DateTime:${receiptStamp(receipt.paid_at)}`)
+  lines.push(EQ)
+
+  lines.push(`ITEM${' '.repeat(12)}QTY${' '.repeat(8)}PRICE${' '.repeat(8)}AMOUNT`)
+  lines.push(DASH)
+  for (const line of receipt.items) {
+    const barcode = line.barcode ? String(line.barcode) : ''
+    lines.push(
+      padReceipt(barcode || ' ', 26) +
+        padReceiptStart(`${line.quantity} x ${moneyPlain(line.unit_price)}`, 20),
+    )
+    lines.push(
+      padReceipt(line.name, 26) +
+        padReceiptStart(moneyPlain(line.line_total), 13) +
+        padReceiptStart(` ${line.tax_code ?? 'A'}`, 7),
+    )
+  }
+  lines.push(DASH)
+
+  lines.push(padReceipt('TOTAL', 26) + padReceiptStart(moneyPlain(receipt.total), 20))
+  if (receipt.tendered != null) {
+    lines.push(padReceipt('CASH', 26) + padReceiptStart(moneyPlain(receipt.tendered), 20))
+    lines.push(padReceipt('CHANGE', 26) + padReceiptStart(moneyPlain(receipt.change ?? 0), 20))
+  }
+  lines.push(DASH)
+
+  lines.push(`TOTAL ITEMS: ${receipt.item_count ?? receipt.items.length}`)
+  if ((receipt.vat_rows ?? []).length > 0) {
+    lines.push(
+      padReceipt('CODE', 8) +
+        padReceiptStart('RATE', 11) +
+        padReceiptStart('VATABLE AMT', 14) +
+        padReceiptStart('VAT AMT', 13),
+    )
+    lines.push(DASH)
+    for (const row of receipt.vat_rows) {
+      lines.push(
+        padReceipt(` ${row.code}`, 8) +
+          padReceiptStart(`${row.rate.toFixed(2)}%`, 11) +
+          padReceiptStart(moneyPlain(row.vatable), 14) +
+          padReceiptStart(moneyPlain(row.vat), 13),
+      )
+    }
+    lines.push(DASH)
+  }
+
+  const paidBy =
+    receipt.payment_method === 'cash'
+      ? 'Cash'
+      : receipt.payment_method === 'mobile'
+        ? 'Mobile Money'
+        : receipt.payment_method
+  lines.push(
+    receipt.tendered != null
+      ? `Cash             :  ${moneyPlain(receipt.tendered)}`
+      : `PAID BY         :  ${paidBy.toUpperCase()}`,
+  )
+  lines.push(DASH)
+  lines.push(padReceipt(' PRICES INCLUSIVE OF VAT WHERE APPLICABLE', W))
+  lines.push('')
+  lines.push(centerReceipt('Thank You !', W))
+  lines.push(
+    padReceipt(`RECEIPT # ${shortId(receipt.order_id)}`, 22) +
+      padReceiptStart(receiptStamp(receipt.paid_at), 24),
+  )
+  lines.push(EQ)
+  return lines
+}
+
 interface NewSaleModalProps {
   onClose: () => void
   onComplete: () => void
@@ -41,6 +159,7 @@ export function NewSaleModal({ onClose, onComplete }: NewSaleModalProps) {
   const [scanOpen, setScanOpen] = useState(false)
   const [manualBarcode, setManualBarcode] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('cash')
+  const [tendered, setTendered] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
@@ -112,7 +231,9 @@ export function NewSaleModal({ onClose, onComplete }: NewSaleModalProps) {
     setBusy(true)
     setError(null)
     try {
-      const { receipt: paid } = await api.checkout(order.id, method)
+      const cashTendered =
+        method === 'cash' && tendered.trim() !== '' ? Number(tendered) : undefined
+      const { receipt: paid } = await api.checkout(order.id, method, cashTendered)
       setReceipt(paid)
       setBusy(false)
       void dispatchToPrinter()
@@ -189,67 +310,17 @@ export function NewSaleModal({ onClose, onComplete }: NewSaleModalProps) {
             </div>
           )}
 
-          {/* The printable receipt */}
+          {/* The printable receipt — KRA-style fiscal layout */}
           <div className="print-receipt mt-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 print:mt-0 print:max-w-none print:rounded-none print:p-4 print:shadow-none print:ring-0">
-            <div className="text-center">
-              <p className="text-base font-bold text-slate-900">
-                {receipt.store_name ?? 'Check Out'}
-              </p>
-              <p className="mt-0.5 text-xs uppercase tracking-wider text-slate-400">
-                Sales receipt
-              </p>
-            </div>
-
-            <div className="mt-4 border-t border-dashed border-slate-300" />
-
-            <dl className="mt-4 space-y-1.5 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-400">Order</dt>
-                <dd className="font-medium text-slate-800">#{shortId(receipt.order_id)}</dd>
+            <pre className="whitespace-pre font-mono text-[11px] leading-snug text-slate-900">
+              {receiptLines(receipt).join('\n')}
+            </pre>
+            {receipt.qr_data && (
+              <div className="mt-3 flex flex-col items-center gap-1 border-t border-dashed border-slate-300 pt-3">
+                <img src={receipt.qr_data} alt="Receipt QR code" className="h-24 w-24" />
+                <p className="text-[10px] text-slate-400">Scan at the till to reprint this receipt</p>
               </div>
-              {receipt.customer_name && (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-slate-400">Customer</dt>
-                  <dd className="font-medium text-slate-800">{receipt.customer_name}</dd>
-                </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-400">Date</dt>
-                <dd className="font-medium text-slate-800">{formatTime(receipt.paid_at)}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-400">Paid with</dt>
-                <dd className="font-medium text-slate-800">
-                  {methodLabels[receipt.payment_method] ?? receipt.payment_method}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="mt-4 border-t border-dashed border-slate-300" />
-
-            <ul className="mt-4 space-y-2.5">
-              {receipt.items.map((line, i) => (
-                <li key={i} className="flex items-start justify-between gap-3 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-slate-800">{line.name}</p>
-                    <p className="text-xs text-slate-400">
-                      {line.quantity} × {formatMoney(line.unit_price)}
-                      {line.barcode ? ` · ${line.barcode}` : ''}
-                    </p>
-                  </div>
-                  <p className="font-medium text-slate-800">{formatMoney(line.line_total)}</p>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-4 border-t border-dashed border-slate-300" />
-
-            <div className="mt-4 flex justify-between">
-              <span className="text-base font-semibold text-slate-900">Total</span>
-              <span className="text-lg font-bold text-slate-900">{formatMoney(receipt.total)}</span>
-            </div>
-
-            <p className="mt-6 text-center text-xs text-slate-400">Thank you for shopping with us!</p>
+            )}
           </div>
 
           <div className="mt-6 flex gap-3 print:hidden">
@@ -389,6 +460,22 @@ export function NewSaleModal({ onClose, onComplete }: NewSaleModalProps) {
               </button>
             ))}
           </div>
+
+          {method === 'cash' && (
+            <label className="mt-3 block text-sm font-medium text-slate-700">
+              Amount received (KSh)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={tendered}
+                onChange={(e) => setTendered(e.target.value)}
+                placeholder="Cash tendered — prints CASH / CHANGE on the receipt"
+                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+              />
+            </label>
+          )}
         </div>
 
         {/* Totals + checkout. */}

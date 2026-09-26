@@ -9,6 +9,7 @@ import {
   Printer as PrinterIcon,
   QrCode,
   ScanLine,
+  Tag,
   Trash2,
   X,
 } from 'lucide-react'
@@ -126,12 +127,25 @@ export function PrintersPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editTill, setEditTill] = useState('')
 
+  // Receipt identity (VAT # / PIN / till no) — printed at the top of receipts.
+  const [vatNumber, setVatNumber] = useState('')
+  const [pin, setPin] = useState('')
+  const [tillNumber, setTillNumber] = useState('')
+  const [savingIdentity, setSavingIdentity] = useState(false)
+  const [identitySaved, setIdentitySaved] = useState(false)
+
   const load = useCallback(async () => {
     if (!api) return
     setError(null)
     try {
-      const { printers } = await api.myPrinters()
+      const [{ printers }, { supermarket }] = await Promise.all([
+        api.myPrinters(),
+        api.mySupermarket(),
+      ])
       setPrinters(printers)
+      setVatNumber(supermarket.vat_number ?? '')
+      setPin(supermarket.pin ?? '')
+      setTillNumber(supermarket.till_number ?? '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load printers')
     } finally {
@@ -210,6 +224,27 @@ export function PrintersPage() {
   function disconnectPrinter() {
     setConnectedPrinter(null)
     setConnected(null)
+  }
+
+  /** Save the KRA receipt header (VAT #, PIN, till no) for this store. */
+  async function saveIdentity() {
+    if (!api) return
+    setSavingIdentity(true)
+    setActionError(null)
+    setIdentitySaved(false)
+    try {
+      await api.updateSupermarket({
+        vat_number: vatNumber.trim() === '' ? null : vatNumber.trim(),
+        pin: pin.trim() === '' ? null : pin.trim(),
+        till_number: tillNumber.trim() === '' ? null : tillNumber.trim(),
+      })
+      setIdentitySaved(true)
+      window.setTimeout(() => setIdentitySaved(false), 2500)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not save receipt identity')
+    } finally {
+      setSavingIdentity(false)
+    }
   }
 
   function handleScan(raw: string) {
@@ -493,6 +528,59 @@ export function PrintersPage() {
               each prints its own receipts.
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+          <Tag className="h-4.5 w-4.5 text-teal-600" />
+          Receipt identity
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          VAT #, PIN and till number are printed at the top of every receipt (KRA-style header).
+          Products carry their own VAT rate from the Products page; leave a field blank to omit it.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <label className="block text-sm font-medium text-slate-700">
+            VAT number
+            <input
+              value={vatNumber}
+              onChange={(e) => setVatNumber(e.target.value)}
+              placeholder="e.g. 0109300U"
+              maxLength={40}
+              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            KRA PIN
+            <input
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="e.g. P051123223G"
+              maxLength={40}
+              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Till number
+            <input
+              value={tillNumber}
+              onChange={(e) => setTillNumber(e.target.value)}
+              placeholder="e.g. 27-02"
+              maxLength={40}
+              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            onClick={() => void saveIdentity()}
+            disabled={savingIdentity}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+          >
+            {savingIdentity ? 'Saving…' : 'Save receipt identity'}
+          </button>
+          {identitySaved && <span className="text-sm font-medium text-teal-700">Saved ✓</span>}
         </div>
       </div>
 

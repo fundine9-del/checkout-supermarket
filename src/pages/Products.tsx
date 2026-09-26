@@ -5,7 +5,7 @@ import { ProductScanModal } from '../components/ProductScanModal'
 import { formatMoney } from '../lib/api'
 import type { Item } from '../lib/types'
 
-const emptyDraft = { name: '', barcode: '', price: '', category: '', stock: '0' }
+const emptyDraft = { name: '', barcode: '', price: '', category: '', stock: '0', vat_rate: '16' }
 
 export function ProductsPage() {
   const { api } = useAuth()
@@ -65,6 +65,7 @@ export function ProductsPage() {
       price: String(item.price),
       category: item.category ?? '',
       stock: String(item.stock),
+      vat_rate: String(item.vat_rate),
     })
     setFormError(null)
     setModalOpen(true)
@@ -82,6 +83,7 @@ export function ProductsPage() {
         price: Number(draft.price),
         category: draft.category.trim() === '' ? null : draft.category.trim(),
         stock: Number(draft.stock),
+        vat_rate: Number(draft.vat_rate),
       }
       if (editing) {
         await api.updateItem(editing.id, body)
@@ -274,7 +276,7 @@ export function ProductsPage() {
               </label>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="mt-4 grid grid-cols-3 gap-4">
               <label className="block text-sm font-medium text-slate-700">
                 Price (KSh)
                 <input
@@ -299,7 +301,22 @@ export function ProductsPage() {
                   className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
                 />
               </label>
+              <label className="block text-sm font-medium text-slate-700">
+                VAT rate %
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={draft.vat_rate}
+                  onChange={(e) => setDraft({ ...draft, vat_rate: e.target.value })}
+                  className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                />
+              </label>
             </div>
+            <p className="mt-2 text-xs text-slate-400">
+              VAT rate is printed on the receipt (16% standard — enter 0 for zero-rated goods).
+            </p>
 
             {formError && <p className="mt-3 text-sm text-red-600">{formError}</p>}
 

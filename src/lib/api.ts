@@ -145,11 +145,26 @@ export function createApi(token: string) {
         method: 'DELETE',
         ...auth,
       }),
-    checkout: (orderId: string, paymentMethod: string) =>
+    checkout: (orderId: string, paymentMethod: string, tendered?: number) =>
       req<{ order: OrderWithItems; receipt: Receipt }>(
         `/orders/${orderId}/checkout`,
-        { method: 'POST', body: { payment_method: paymentMethod }, ...auth },
+        {
+          method: 'POST',
+          body: tendered === undefined
+            ? { payment_method: paymentMethod }
+            : { payment_method: paymentMethod, tendered },
+          ...auth,
+        },
       ),
+
+    // Update the store's receipt identity (VAT #, PIN, till no) — printed at
+    // the top of every KRA-style receipt.
+    updateSupermarket: (patch: {
+      name?: string
+      vat_number?: string | null
+      pin?: string | null
+      till_number?: string | null
+    }) => req<{ supermarket: Supermarket }>('/supermarkets/me', { method: 'PATCH', body: patch, ...auth }),
 
     integration: () =>
       req<{
